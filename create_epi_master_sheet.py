@@ -4,7 +4,6 @@ import argparse
 import importlib
 from pathlib import Path
 from typing import Dict, Iterable, List, Sequence, Tuple
-from urllib.parse import urlparse
 
 import pandas as pd
 
@@ -177,21 +176,21 @@ def build_indicator(indicator: pd.DataFrame) -> pd.DataFrame:
         (7, (("period", "Q1_2025"), ("TvA", "achievement"), ("Gender", "Female"), ("AgeGroup", "U1"))),
         (9, (("period", "Q1_2025"), ("TvA", "achievement"), ("Gender", "Female"), ("AgeGroup", "1to5"))),
         (8, (("period", "Q1_2025"), ("TvA", "achievement"), ("Gender", "Male"), ("AgeGroup", "1to5"))),
-        (14, (("period", "Q2_2025"), ("TvA", "achievement"), ("Gender", "Female"), ("AgeGroup", "1to5"))),
-        (10, (("period", "Q2_2025"), ("TvA", "target"), ("Gender", "Combine"), ("AgeGroup", "U5"))),
-        (13, (("period", "Q2_2025"), ("TvA", "achievement"), ("Gender", "Male"), ("AgeGroup", "1to5"))),
-        (12, (("period", "Q2_2025"), ("TvA", "achievement"), ("Gender", "Female"), ("AgeGroup", "U1"))),
-        (11, (("period", "Q2_2025"), ("TvA", "achievement"), ("Gender", "Male"), ("AgeGroup", "U1"))),
-        (15, (("period", "Q3_2025"), ("TvA", "target"), ("Gender", "Combine"), ("AgeGroup", "U5"))),
-        (16, (("period", "Q3_2025"), ("TvA", "achievement"), ("Gender", "Male"), ("AgeGroup", "U1"))),
-        (17, (("period", "Q3_2025"), ("TvA", "achievement"), ("Gender", "Female"), ("AgeGroup", "U1"))),
-        (18, (("period", "Q3_2025"), ("TvA", "achievement"), ("Gender", "Male"), ("AgeGroup", "1to5"))),
-        (19, (("period", "Q3_2025"), ("TvA", "achievement"), ("Gender", "Female"), ("AgeGroup", "1to5"))),
-        (20, (("period", "Q4_2025"), ("TvA", "target"), ("Gender", "Combine"), ("AgeGroup", "U5"))),
-        (21, (("period", "Q4_2025"), ("TvA", "achievement"), ("Gender", "Male"), ("AgeGroup", "U1"))),
-        (22, (("period", "Q4_2025"), ("TvA", "achievement"), ("Gender", "Female"), ("AgeGroup", "U1"))),
-        (24, (("period", "Q4_2025"), ("TvA", "achievement"), ("Gender", "Female"), ("AgeGroup", "1to5"))),
-        (23, (("period", "Q4_2025"), ("TvA", "achievement"), ("Gender", "Male"), ("AgeGroup", "1to5"))),
+        (11, (("period", "Q2_2025"), ("TvA", "target"), ("Gender", "Combine"), ("AgeGroup", "U5"))),
+        (12, (("period", "Q2_2025"), ("TvA", "achievement"), ("Gender", "Male"), ("AgeGroup", "U1"))),
+        (13, (("period", "Q2_2025"), ("TvA", "achievement"), ("Gender", "Female"), ("AgeGroup", "U1"))),
+        (15, (("period", "Q2_2025"), ("TvA", "achievement"), ("Gender", "Female"), ("AgeGroup", "1to5"))),
+        (14, (("period", "Q2_2025"), ("TvA", "achievement"), ("Gender", "Male"), ("AgeGroup", "1to5"))),
+        (17, (("period", "Q3_2025"), ("TvA", "target"), ("Gender", "Combine"), ("AgeGroup", "U5"))),
+        (18, (("period", "Q3_2025"), ("TvA", "achievement"), ("Gender", "Male"), ("AgeGroup", "U1"))),
+        (19, (("period", "Q3_2025"), ("TvA", "achievement"), ("Gender", "Female"), ("AgeGroup", "U1"))),
+        (20, (("period", "Q3_2025"), ("TvA", "achievement"), ("Gender", "Male"), ("AgeGroup", "1to5"))),
+        (21, (("period", "Q3_2025"), ("TvA", "achievement"), ("Gender", "Female"), ("AgeGroup", "1to5"))),
+        (23, (("period", "Q4_2025"), ("TvA", "target"), ("Gender", "Combine"), ("AgeGroup", "U5"))),
+        (24, (("period", "Q4_2025"), ("TvA", "achievement"), ("Gender", "Male"), ("AgeGroup", "U1"))),
+        (25, (("period", "Q4_2025"), ("TvA", "achievement"), ("Gender", "Female"), ("AgeGroup", "U1"))),
+        (27, (("period", "Q4_2025"), ("TvA", "achievement"), ("Gender", "Female"), ("AgeGroup", "1to5"))),
+        (26, (("period", "Q4_2025"), ("TvA", "achievement"), ("Gender", "Male"), ("AgeGroup", "1to5"))),
     ]
     out = to_numeric_round(build_long(indicator, 4, specs, "value"), "value", 2)
     return apply_dynamic_period_from_year(out)
@@ -233,23 +232,7 @@ def build_td_alod(td_alod: pd.DataFrame) -> pd.DataFrame:
     return apply_dynamic_period_from_year(out)
 
 
-def extract_spreadsheet_id(sheet_url: str) -> str | None:
-    parsed = urlparse(sheet_url)
-    parts = [part for part in parsed.path.split("/") if part]
-    if "d" not in parts:
-        return None
-    idx = parts.index("d")
-    if idx + 1 >= len(parts):
-        return None
-    return parts[idx + 1]
-
-
-def try_sync_google_sheets(
-    sheet_name: str,
-    tables: Dict[str, pd.DataFrame],
-    secrets_dir: Path,
-    sheet_url: str | None = None,
-) -> None:
+def try_sync_google_sheets(sheet_name: str, tables: Dict[str, pd.DataFrame], secrets_dir: Path) -> None:
     try:
         gspread = importlib.import_module("gspread")
         set_with_dataframe = importlib.import_module(
@@ -285,18 +268,10 @@ def try_sync_google_sheets(
         authorized_user_filename=str(authorized_user_filename),
     )
 
-    spreadsheet = None
-    if sheet_url:
-        spreadsheet_id = extract_spreadsheet_id(sheet_url)
-        if spreadsheet_id:
-            spreadsheet = gc.open_by_key(spreadsheet_id)
-        else:
-            spreadsheet = gc.open_by_url(sheet_url)
-    else:
-        try:
-            spreadsheet = gc.open(sheet_name)
-        except gspread.SpreadsheetNotFound:
-            spreadsheet = gc.create(sheet_name)
+    try:
+        spreadsheet = gc.open(sheet_name)
+    except gspread.SpreadsheetNotFound:
+        spreadsheet = gc.create(sheet_name)
 
     for ws_name, table in tables.items():
         try:
@@ -354,12 +329,6 @@ def main() -> None:
         help="Google Sheet name for --sync-google.",
     )
     parser.add_argument(
-        "--sheet-url",
-        type=str,
-        default="",
-        help="Google Sheet URL for --sync-google. If provided, this is used instead of --sheet-name.",
-    )
-    parser.add_argument(
         "--secrets-dir",
         type=Path,
         default=epi_thematic_dir / ".secrets",
@@ -399,12 +368,7 @@ def main() -> None:
         print(f"- {name}: {len(table):,} rows x {len(table.columns)} cols")
 
     if args.sync_google:
-        try_sync_google_sheets(
-            args.sheet_name,
-            tables,
-            args.secrets_dir.resolve(),
-            sheet_url=args.sheet_url.strip() or None,
-        )
+        try_sync_google_sheets(args.sheet_name, tables, args.secrets_dir.resolve())
 
 
 if __name__ == "__main__":
