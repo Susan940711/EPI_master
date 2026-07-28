@@ -232,7 +232,12 @@ def build_td_alod(td_alod: pd.DataFrame) -> pd.DataFrame:
     return apply_dynamic_period_from_year(out)
 
 
-def try_sync_google_sheets(sheet_name: str, tables: Dict[str, pd.DataFrame], secrets_dir: Path) -> None:
+def try_sync_google_sheets(
+    sheet_name: str,
+    tables: Dict[str, pd.DataFrame],
+    secrets_dir: Path,
+    sheet_url: str = "",
+) -> None:
     try:
         gspread = importlib.import_module("gspread")
         set_with_dataframe = importlib.import_module(
@@ -268,10 +273,13 @@ def try_sync_google_sheets(sheet_name: str, tables: Dict[str, pd.DataFrame], sec
         authorized_user_filename=str(authorized_user_filename),
     )
 
-    try:
-        spreadsheet = gc.open(sheet_name)
-    except gspread.SpreadsheetNotFound:
-        spreadsheet = gc.create(sheet_name)
+    if sheet_url and sheet_url.strip():
+        spreadsheet = gc.open_by_url(sheet_url.strip())
+    else:
+        try:
+            spreadsheet = gc.open(sheet_name)
+        except gspread.SpreadsheetNotFound:
+            spreadsheet = gc.create(sheet_name)
 
     for ws_name, table in tables.items():
         try:
@@ -329,6 +337,12 @@ def main() -> None:
         help="Google Sheet name for --sync-google.",
     )
     parser.add_argument(
+        "--sheet-url",
+        type=str,
+        default="",
+        help="Google Sheet URL for --sync-google. If provided, this is used instead of --sheet-name.",
+    )
+    parser.add_argument(
         "--secrets-dir",
         type=Path,
         default=epi_thematic_dir / ".secrets",
@@ -368,7 +382,12 @@ def main() -> None:
         print(f"- {name}: {len(table):,} rows x {len(table.columns)} cols")
 
     if args.sync_google:
-        try_sync_google_sheets(args.sheet_name, tables, args.secrets_dir.resolve())
+        try_sync_google_sheets(
+            args.sheet_name,
+            tables,
+            args.secrets_dir.resolve(),
+            sheet_url=args.sheet_url,
+        )
 
 
 if __name__ == "__main__":
